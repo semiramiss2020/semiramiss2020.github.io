@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html>
+<meta charset="UTF-8">
+
+
+<style>
+
+#buttons {
+    position: absolute;
+    top: 10px;
+    left: 20px;
+    height: 100px;
+    width: 400px;
+    z-index: 99;
+}
+
+
+
+
+#c1 {
+  top: 3em;
+  left: 1em;
+}
+
+#c2 {
+  top: 2em;
+  left: 1em;
+}
+
+#c3 {
+  top: 1em;
+  left: 1em;
+}
+
+
+
+
+
+.node {
+	stroke: black;
+	stroke-width: 2px;
+	pointer-events: all;
+}
+
+
+
+.link {
+	/*stroke: gray;*/
+	stroke-width: 1px;
+	pointer-events: all;
+}
+
+
+.link.value1 {
+	stroke: #ABEBC6;
+}
+
+.link.value2 {
+	stroke: #D2B4DE;
+}
+
+
+
+
+
+</style>
+
+
+
+<button type="button" class="filter-btn" color="green" id="c1" value="1"><span>apply_filter</span> InfoVis</button>
+<button type="button" class="filter-btn" id="c2" value="2"><span>apply_filter</span> VAST</button>
+<button type="button" class="filter-btn" id="c3" value="3"><span>apply_filter</span> SciVis</button>
+
+
+
+
+
+
+</style>
+<svg width="1500" height="650"></svg>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="https://code.easypz.io/easypz.latest.js"></script>
+<script>
+
+
+
+//<svg width="2960" height="1600"></svg>
+var width = window.innerWidth, height = window.innerHeight;
+
+
+
+
+//<script src="anim.js?2.24.0"></script>
+
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3-legend/2.24.0/d3-legend.min.js"></script>
+<script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
+
+
+
+
+
+<script
+  src="https://code.jquery.com/jquery-3.2.1.min.js"
+  integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4="
+  crossorigin="anonymous"></script>
+
+
+<script>
+
+
+//	data stores
+var graph, store;
+/********************************************************************************************************************/
+//	svg selection and sizing
+var svg = d3.select("svg"),
+    width = +svg.attr("width"),
+    height = +svg.attr("height")
+   // radius = 2;
+/********************************************************************************************************************/
+//	d3 color scales
+
+var color = d3.scaleOrdinal(d3.schemeDark2);
+var x = d3.scaleLinear().domain([0, width]).range([0, width]);
+var y = d3.scaleLinear().domain([0, height]).range([0, height]);
+
+/***********************************************************************************************************************/
+var link = svg.append("g")
+    
+      .attr("class", "links")
+     .selectAll("line")
+
+
+var node = svg.append("g").selectAll(".node");
+/******************************************************************************************************************************/
+//	force simulation initialization
+var simulation = d3.forceSimulation()
+	.force("link", d3.forceLink()
+		.id(function(d) { return d.id; }))
+	.force("charge", d3.forceManyBody()
+		.strength(function(d) { return -100;}))
+	.force("center", d3.forceCenter(width / 2, height / 2));
+	
+/******************************************************************************************/	
+//	filtered types
+typeFilterList = [];
+
+//filter option event handlers
+$(".filter-btn").on("click", function() {
+	var id = $(this).attr("value");
+	if (typeFilterList.includes(id)) {
+	d3.select(this).select('span').text('apply_filter');
+		typeFilterList.splice(typeFilterList.indexOf(id), 1)
+	} else {
+	d3.select(this).select('span').text('reset');
+		typeFilterList.push(id);
+	}
+	filter();
+	update();
+});
+/**********************************************************************************************************/
+//	data read and store
+d3.json("b.json", function(err, g) {
+	if (err) throw err;
+
+	var nodeByID = {};
+
+	g.nodes.forEach(function(n) {
+		nodeByID[n.id] = n;
+	});
+
+	g.links1.forEach(function(l) {
+		l.sourceGroup = nodeByID[l.source].type.toString();
+		l.targetGroup = nodeByID[l.target].type.toString();
+	});
+
+	graph = g;
+	store = $.extend(true, {}, g);
+
+	update();
+});
+/*************************************************************************************************************/
+//	general update pattern for updating the graph
+function update() {
+	//	UPDATE
+	node = node.data(graph.nodes, function(d) { return d.id;});
+	//	EXIT
+	node.exit().remove();
+	//	ENTER
+	var newNode = node.enter().append("circle")
+		.attr("class", "node")
+		.attr("r", function(d) { return d.size; })
+		.attr("fill", function(d) {return color(d.group);})
+	    //.attr("fill", function(d) {return color(d.group)}!important;)
+	   
+	
+		.call(d3.drag()
+          .on("start", dragstarted)
+          .on("drag", dragged)
+          .on("end", dragended)
+        )
+/***********************************************************************************************************************************************/
+    newNode.append("title")
+      //.text(function(d) { return "id: " + d.id + "\n" + "Title: " + d.Title + "\n" + "name: " + d.name + "\n" + "This: " + d.This + "\n" + "Year: " + d.Year + "\n" + "DOI: " + d.DOI + "\n" + "Conference: " + d.Conference + "\n" + "Link: " + d.Link + "\n" + "PaperType: " + d.PaperType + "\n"  + "AuthorNames: " + d.AuthorNames + "\n"  +"InternalReferences: " + d.InternalReferences + "\n" + "AuthorKeywords: " + d.AuthorKeywords + "\n" + "Abstract: " + d.Abstract+ "PubsCited: " + d.PubsCited + "\n" + "FirstPage: " + d.FirstPage + "\n" + "LastPage: " + d.LastPage + "\n" + "AminerCitationCount: " + d.AminerCitationCount + "\n" + "XploreCitationCount: " + d.XploreCitationCount; });
+	  //.text(function(d) { return  d.category + "\n" +  d.name + "\n" + d.This + "\n" + d.Title + "\n"  + d.Year + "\n" + d.DOI + "\n" + d.Conference + "\n" + d.Link + "\n" + d.PaperType + "\n" + d.AuthorNames + "\n" + d.InternalReferences + "\n" + d.AuthorKeywords + "\n" + d.Abstract + "\n" + d.FirstPage + "\n" + d.LastPage + "\n" +  d.Award + "\n" + d.AminerCitationCountt + "\n" + d.AminerCitationCountttttt + "\n" + d.PubsCited + "\n" + d.XploreCitationCount; });
+	  .text(function(d) { return  d.category + "\n" +  d.name + "\n" + d.This + "\n" + d.Title + "\n" + d.AuthorNames + "\n" + d.Conference; });
+/***************************************************************************************************************************************************************/		
+	//	ENTER + UPDATE
+	node = node.merge(newNode);
+
+	//	UPDATE
+	link = link.data(graph.links1, function(d) { return d.id;});
+           
+
+	//	EXIT
+	link.exit().remove();
+	//	ENTER
+	newLink = link.enter().append("line")
+		.attr("class", "link")
+                .classed("link", true)
+		.each(function (d) {
+			var value = d.value;
+			d3.select(this)
+			.classed("value"+value, true);
+		});
+/***************************************************************************************************************************************************/
+	newLink.append("title")
+      .text(function(d) { return "source: " + d.source + "\n" + "target: " + d.target; });
+/*********************************************************************************************************************************************************/	  
+	//	ENTER + UPDATE
+	link = link.merge(newLink);
+
+	//	update simulation nodes, links, and alpha
+	simulation
+		.nodes(graph.nodes)
+		.on("tick", ticked);
+
+  	simulation.force("link")
+  		.links(graph.links1);
+
+  	simulation.alpha(1).alphaTarget(0).restart();
+}
+/****************************************************************************************************************************************/
+var dragStartX = 0, dragStartY = 0;
+function dragstarted(d) {
+  if (!d3.event.active) simulation.alphaTarget(0.1).restart();
+  d.fx = dragStartX = d.x;
+  d.fy = dragStartY = d.y;
+}
+
+function dragged(d) {
+  d.fx = dragStartX + (d3.event.x - dragStartX) * (width / (x.range()[1] - x.range()[0]));
+  d.fy = dragStartY + (d3.event.y - dragStartY) * (height / (y.range()[1] - y.range()[0]));
+}
+function dragended(d) {
+	if (!d3.event.active) simulation.alphaTarget(0);
+	d.fx = null;
+	d.fy = null;
+}
+/****************************************************************************************************************************************/
+  new EasyPZ(svg, function(transform)
+  {
+      x.range([transform.translateX, transform.translateX + width * transform.scale]);
+      y.range([transform.translateY, transform.translateY + height * transform.scale]);
+      ticked();
+  });
+/*************************************************************************************************************************************/
+//	tick event handler with bounded box
+function ticked() {
+         node
+		.attr("cx", function(d) { return x(d.x); })
+		.attr("cy", function(d) { return y(d.y); });
+
+
+        link
+              .attr("x1", function(d) { return x(d.source.x); })
+              .attr("y1", function(d) { return y(d.source.y); })
+              .attr("x2", function(d) { return x(d.target.x); })
+              .attr("y2", function(d) { return y(d.target.y); });
+}
+/***************************************************************/
+//	filter function
+function filter() {
+	//	add and remove nodes from data based on type filters
+	store.nodes.forEach(function(n) {
+		if (!typeFilterList.includes(n.type) && n.filtered) {
+			n.filtered = false;
+			graph.nodes.push($.extend(true, {}, n));
+		} else if (typeFilterList.includes(n.type) && !n.filtered) {
+			n.filtered = true;
+			graph.nodes.forEach(function(d, i) {
+				if (n.id === d.id) {
+					graph.nodes.splice(i, 1);
+				}
+			});
+		}
+	});
+
+	//	add and remove links from data based on availability of nodes
+	store.links1.forEach(function(l) {
+		if (!(typeFilterList.includes(l.sourceGroup) || typeFilterList.includes(l.targetGroup)) && l.filtered) {
+			l.filtered = false;
+			graph.links1.push($.extend(true, {}, l));
+		} else if ((typeFilterList.includes(l.sourceGroup) || typeFilterList.includes(l.targetGroup)) && !l.filtered) {
+			l.filtered = true;
+			graph.links1.forEach(function(d, i) {
+				if (l.id === d.id) {
+					graph.links1.splice(i, 1);
+				}
+			});
+		}
+	});
+}
+
+/*********************************************************************************************************************************************/
+//legend start
+
+  var sequentialScale = d3.scaleOrdinal(d3.schemeDark2)
+  .domain(["author", "paper", "author_author", "author_paper"]);
+
+svg.append("g")
+  .attr("class", "legendSequential")
+  .attr("transform", "translate("-(width+140)+","+(height-400)+")");
+
+var legendSequential = d3.legendColor()
+    .shapeWidth(30)
+    .cells(4)
+    .orient("vertical")
+		.title("color:")
+		.titleWidth(100)
+    .scale(sequentialScale) 
+
+svg.select(".legendSequential")
+  .call(legendSequential); 
+//
+
+</script>
